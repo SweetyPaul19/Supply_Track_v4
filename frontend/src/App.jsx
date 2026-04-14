@@ -21,6 +21,21 @@ function App() {
         <ProtectedRoute><ShopDashboard /></ProtectedRoute>
       } />
 
+      {/* Shop owner cart dashboard */}
+      <Route path="/cart" element={
+        <ProtectedRoute><ShopDashboard /></ProtectedRoute>
+      } />
+
+      {/* Shop owner order dashboard */}
+      <Route path="/orders" element={
+        <ProtectedRoute><ShopDashboard /></ProtectedRoute>
+      } />
+
+      {/* Shop owner order dashboard */}
+      <Route path="/invoice" element={
+        <ProtectedRoute><ShopDashboard /></ProtectedRoute>
+      } />
+
       {/* Admin / fleet view */}
       <Route path="/fleet" element={
         <ProtectedRoute><AdminDashboard /></ProtectedRoute>

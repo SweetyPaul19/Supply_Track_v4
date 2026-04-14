@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import socket from '../services/socket';
 import AuctionModal from '../components/AuctionModal';
 import { useAuth } from '../context/AuthContext';
@@ -159,7 +159,7 @@ export default function AdminDashboard() {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    axios.get(`${API}/truck/fleet`)
+    api.get(`/truck/fleet`)
       .then(r => {
         setFleet(r.data);
         setSelectedTruck(r.data[0]?.truck_id || null);

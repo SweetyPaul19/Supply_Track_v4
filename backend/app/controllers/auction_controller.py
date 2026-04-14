@@ -20,7 +20,7 @@ active_auction_state = {
 
 
 def start_auction_in_memory(auction_id, truck_id, batch_item, base_price,
-                             truck_lat=23.5742, truck_lng=87.3203):
+                             truck_lat=23.574183559967356, truck_lng=87.32041803582375):
     global active_auction_state
 
     active_auction_state.update({

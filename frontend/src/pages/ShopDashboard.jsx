@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useLocation,useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import socket from '../services/socket';
 import AuctionModal from '../components/AuctionModal';
 import { useAuth } from '../context/AuthContext';
 
-const API = 'http://127.0.0.1:5000/api';
+
 
 const haversine = (lat1, lon1, lat2, lon2) => {
   const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
@@ -31,9 +31,17 @@ const STATUS_COLORS = {
 
 export default function ShopDashboard() {
   const { user, logout, refreshProfile } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  const [view,             setView]             = useState('marketplace');
+  const path = location.pathname;
+
+  //const [view,             setView]             = useState('marketplace');
+  const view =
+  path === '/cart' ? 'cart' :
+  path === '/orders' ? 'orders' :
+  path === '/invoice' ? 'invoice' :
+  'marketplace';
   const [catalogue,        setCatalogue]        = useState([]);
   const [orders,           setOrders]           = useState([]);
   const [cart,             setCart]             = useState({});
@@ -45,18 +53,26 @@ export default function ShopDashboard() {
   const [notes,            setNotes]            = useState('');
   const [creditAnim,       setCreditAnim]       = useState(false);
 
-  const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+
 
   useEffect(() => {
-    axios.get(`${API}/shop/catalogue`).then(r => setCatalogue(r.data)).catch(console.error);
+    api.get(`/shop/catalogue`).then(r => setCatalogue(r.data)).catch(console.error);
   }, []);
 
-  const fetchOrders = useCallback(() => {
-    axios.get(`${API}/shop/orders`, { headers: authHeaders })
-      .then(r => setOrders(r.data)).catch(console.error);
-  }, []);
+  const fetchOrders = useCallback(async() => {
+    if(!user) return;
+    try{
+      const r = await api.get(`/shop/orders`)
+      .then(r => setOrders(r.data))
+      .catch(console.error);
+  } catch(e){
+    console.log(e);
+  }
+}, [user]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { 
+    fetchOrders();
+   }, [fetchOrders]);
 
   useEffect(() => {
     socket.on('emergency_auction_started', (data) => {
@@ -91,21 +107,27 @@ export default function ShopDashboard() {
     setLoading(true);
     try {
       const items = Object.entries(cart).map(([product_id, quantity]) => ({ product_id, quantity }));
-      const res   = await axios.post(`${API}/shop/orders`, { items, notes }, { headers: authHeaders });
+      const res   = await api.post(`/shop/orders`, { items, notes });
       setCart({});
       setNotes('');
-      fetchOrders();
+      await fetchOrders();
       await refreshProfile();
       setCreditAnim(true);
       setTimeout(() => setCreditAnim(false), 2000);
       setSelectedOrder(res.data.order);
-      setView('invoice');
+      navigate('/invoice');
     } catch (e) {
       alert('Failed: ' + (e.response?.data?.error || e.message));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(()=>{
+    if(view==='orders'){
+      fetchOrders();
+    }
+  },[view,fetchOrders]);
 
   const greenCredits = user?.green_credits || 0;
 
@@ -146,7 +168,10 @@ export default function ShopDashboard() {
             { key:'cart',        icon:'🧺', label: cartCount > 0 ? `Cart (${cartCount})` : 'Cart' },
             { key:'orders',      icon:'📋', label:'Orders' },
           ].map(tab => (
-            <button key={tab.key} onClick={() => setView(tab.key)}
+            <button key={tab.key} onClick={() => navigate(
+  tab.key === 'marketplace' ? '/' :
+  `/${tab.key}`
+)}
               style={{ background: view===tab.key ? 'rgba(59,130,246,0.25)' : 'transparent', color: view===tab.key ? '#60a5fa' : '#cbd5e1', border: view===tab.key ? '1px solid rgba(59,130,246,0.4)' : '1px solid transparent', borderRadius:'8px', padding:'6px 14px', cursor:'pointer', fontSize:'13px', fontWeight:600 }}>
               {tab.icon} {tab.label}
             </button>
@@ -257,7 +282,7 @@ export default function ShopDashboard() {
           {/* Floating cart CTA */}
           {cartCount > 0 && (
             <div style={{ position:'fixed', bottom:'24px', right:'24px', zIndex:200 }}>
-              <button onClick={() => setView('cart')}
+              <button onClick={() => navigate('/cart')}
                 style={{ background:'linear-gradient(135deg,#1d4ed8,#3b82f6)', color:'white', border:'none', borderRadius:'16px', padding:'14px 28px', fontSize:'15px', fontWeight:800, cursor:'pointer', boxShadow:'0 8px 32px rgba(59,130,246,0.5)', display:'flex', alignItems:'center', gap:'10px' }}>
                 🧺 View Cart — {cartCount} items &nbsp;·&nbsp; ₹{cartTotal.toLocaleString('en-IN')}
                 {previewCredits > 0 && <span style={{ background:'rgba(255,255,255,0.2)', borderRadius:'10px', padding:'2px 8px', fontSize:'12px' }}>+{previewCredits} 🌱</span>}
@@ -275,7 +300,7 @@ export default function ShopDashboard() {
             <div style={{ textAlign:'center', padding:'80px 0', color:'#94a3b8' }}>
               <div style={{ fontSize:'64px', marginBottom:'16px' }}>🛒</div>
               <div style={{ fontSize:'20px', fontWeight:700, marginBottom:'16px' }}>Your cart is empty</div>
-              <button onClick={() => setView('marketplace')} style={{ background:'#3b82f6', color:'white', border:'none', borderRadius:'10px', padding:'12px 28px', cursor:'pointer', fontWeight:700 }}>Browse Catalogue</button>
+              <button onClick={() => navigate('/')} style={{ background:'#3b82f6', color:'white', border:'none', borderRadius:'10px', padding:'12px 28px', cursor:'pointer', fontWeight:700 }}>Browse Catalogue</button>
             </div>
           ) : (
             <>
@@ -353,7 +378,7 @@ export default function ShopDashboard() {
                 const truck = TRUCK_INFO[order.assigned_truck] || {};
                 return (
                   <div key={order.order_id}
-                    onClick={() => { setSelectedOrder(order); setView('invoice'); }}
+                    onClick={() => { setSelectedOrder(order); navigate('/orders'); }}
                     style={{ background:'white', borderRadius:'14px', padding:'18px 20px', boxShadow:'0 2px 8px rgba(0,0,0,0.05)', border:'1.5px solid #f1f5f9', cursor:'pointer', transition:'all 0.15s' }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor='#3b82f6'; e.currentTarget.style.transform='translateX(4px)'; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor='#f1f5f9'; e.currentTarget.style.transform='none'; }}>
@@ -390,7 +415,7 @@ export default function ShopDashboard() {
       {/* ══ INVOICE ══ */}
       {view === 'invoice' && selectedOrder && (
         <div style={{ maxWidth:'800px', margin:'0 auto', padding:'24px' }}>
-          <button onClick={() => { setSelectedOrder(null); setView('orders'); }}
+          <button onClick={() => { setSelectedOrder(null); navigate('/invoice'); }}
             style={{ background:'white', border:'2px solid #e2e8f0', borderRadius:'8px', padding:'8px 16px', cursor:'pointer', fontWeight:700, marginBottom:'20px', color:'#475569' }}>
             ← Back to Orders
           </button>
