@@ -1,0 +1,97 @@
+/* The moving road animation */
+.animated-road {
+  background-color: #334155; 
+  background-image: linear-gradient(0deg, transparent 50%, #e2e8f0 50%);
+  background-size: 10px 80px; 
+  background-position: center;
+  background-repeat: repeat-y;
+  animation: scrollRoad 1.5s linear infinite;
+  border-left: 12px solid #94a3b8;
+  border-right: 12px solid #94a3b8;
+  position: relative;
+}
+
+@keyframes scrollRoad {
+  from { background-position: center 0; }
+  to { background-position: center 80px; }
+}
+
+/* Realistic Truck Styling */
+.truck-wrapper {
+  position: relative;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+  filter: drop-shadow(0 15px 15px rgba(0,0,0,0.5));
+}
+
+.truck-cab {
+  width: 160px;
+  height: 80px;
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  border-radius: 20px 20px 0 0;
+  border: 2px solid #1e3a8a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+
+.windshield {
+  width: 120px;
+  height: 25px;
+  background: #bae6fd;
+  border: 3px solid #0f172a;
+  border-radius: 10px 10px 4px 4px;
+  margin-top: 15px;
+  box-shadow: inset 0 5px 10px rgba(255,255,255,0.5);
+}
+
+.trailer-joint {
+  width: 50px;
+  height: 15px;
+  background: #1e293b;
+  border-left: 2px solid #000;
+  border-right: 2px solid #000;
+}
+
+.truck-trailer {
+  width: 100%;
+  height: 550px;
+  background: linear-gradient(90deg, #cbd5e1 0%, #f8fafc 50%, #cbd5e1 100%);
+  border: 6px solid #64748b;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  position: relative;
+}
+
+/* 18-Wheeler Tires */
+.wheel {
+  position: absolute;
+  width: 16px;
+  height: 40px;
+  background: #020617;
+  border-radius: 4px;
+  border: 1px solid #334155;
+}
+
+/* Wheel Placements */
+.w-cab-l { top: 30px; left: 50px; }
+.w-cab-r { top: 30px; right: 50px; }
+.w-mid-l { top: 200px; left: -16px; }
+.w-mid-r { top: 200px; right: -16px; }
+.w-mid-l2 { top: 250px; left: -16px; }
+.w-mid-r2 { top: 250px; right: -16px; }
+.w-back-l { bottom: 50px; left: -16px; }
+.w-back-r { bottom: 50px; right: -16px; }
+.w-back-l2 { bottom: 100px; left: -16px; }
+.w-back-r2 { bottom: 100px; right: -16px; }
+
+/* Cargo Grid Custom Scrollbar */
+.cargo-grid::-webkit-scrollbar { width: 6px; }
+.cargo-grid::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
