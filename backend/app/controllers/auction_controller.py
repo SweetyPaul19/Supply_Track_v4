@@ -57,8 +57,8 @@ def test_trigger():
         truck_id="T-1001",
         batch_item="20kg Frozen Chicken Breasts (Temp Breach: 15°C)",
         base_price=800,
-        truck_lat=23.5742,
-        truck_lng=87.3203
+        truck_lat=23.574183559967356, 
+        truck_lng=87.32041803582375
     )
     return jsonify({"status": "Success", "message": "Demo auction started!"}), 200
 

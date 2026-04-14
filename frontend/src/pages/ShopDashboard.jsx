@@ -75,12 +75,42 @@ export default function ShopDashboard() {
    }, [fetchOrders]);
 
   useEffect(() => {
-    socket.on('emergency_auction_started', (data) => {
-      if (!user?.lat || !user?.lng) return;
-      if (haversine(user.lat, user.lng, data.truck_lat, data.truck_lng) <= 99999)
+    const handleEmergency = (data) => {
+      console.log("🚨 [SOCKET RECEIVED] Emergency Broadcast:", data);
+      console.log("📍 [LOCAL USER DATA]", user);
+
+      // --- HACKATHON DEMO FAILSAFE ---
+      // If the user's GPS data is missing from local storage, 
+      // we bypass the filter so the demo doesn't fail on stage!
+      if (!user || !user.lat || !user.lng) {
+        console.warn("⚠️ User has no coordinates in memory! Bypassing distance check for demo.");
         setActiveAuction(data);
-    });
-    return () => socket.off('emergency_auction_started');
+        return;
+      }
+
+      // Force all coordinates to be Numbers before doing Math
+      const dist = haversine(
+        Number(user.lat), 
+        Number(user.lng), 
+        Number(data.truck_lat), 
+        Number(data.truck_lng)
+      );
+
+      console.log(`📏 Distance to spoiling truck: ${dist.toFixed(2)} km`);
+
+      // If within our massive demo radius, trigger the modal!
+      if (dist <= 50) {
+        setActiveAuction(data);
+      } else {
+        console.log("🚚 Truck is out of range. Ignoring.");
+      }
+    };
+
+    socket.on('emergency_auction_started', handleEmergency);
+
+    return () => {
+      socket.off('emergency_auction_started', handleEmergency);
+    };
   }, [user]);
 
   const getQty = (id) => cart[id] || 0;
