@@ -1,92 +1,144 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './TruckView.css';
 
+const API = 'http://127.0.0.1:5000/api';
+
 const TruckView = () => {
   const [hoveredBatch, setHoveredBatch] = useState(null);
-  const { id } = useParams(); 
+  const [truckData,    setTruckData]    = useState(null);
+  const [cargoBatches, setCargoBatches] = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+
+  const { id } = useParams();
   const navigate = useNavigate();
+  const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+
+  useEffect(() => {
+    setLoading(true);
+    axios.get(`${API}/truck/cargo/${id}`, { headers: authHeaders })
+      .then(r => {
+        setTruckData(r.data.truck);
+        setCargoBatches(r.data.cargo);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError('Could not load cargo data. Is Flask running?');
+        setLoading(false);
+        console.error(err);
+      });
+  }, [id]);
 
   const handleTriggerAuction = async (batch) => {
     try {
-      await axios.get('http://127.0.0.1:5000/api/auction/test-trigger');
-      alert(`✅ Flash Auction triggered successfully for ${batch.name}! All nearby shops have been notified.`);
-    } catch (error) {
-      console.error("Failed to trigger auction:", error);
-      alert("❌ Failed to connect to the server.");
+      await axios.post(`${API}/auction/trigger`, {
+        auction_id: `A-${batch.id}`,
+        truck_id:   id,
+        batch_item: `${batch.quantity} × ${batch.name} (${batch.unit}) — Temp: ${batch.temp}°C`,
+        base_price: 500,
+        truck_lat:  truckData?.lat  || 23.5742,
+        truck_lng:  truckData?.lng  || 87.3203,
+      }, { headers: authHeaders });
+      alert(`✅ Flash Auction triggered for ${batch.name}! All nearby shops notified.`);
+    } catch (err) {
+      console.error(err);
+      alert('❌ Failed to trigger auction.');
     }
   };
 
-  const truckDetails = {
-    id: id, 
-    distanceLeft: "87 km",
-    daysLeft: "3 Hours",
-    destination: "Durgapur Central Hub",
-  };
+  // Loading screen
+  if (loading) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#f1f5f9', fontFamily:'sans-serif' }}>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:'48px', marginBottom:'16px' }}>🚛</div>
+          <div style={{ fontSize:'18px', color:'#64748b', fontWeight:700 }}>Loading IoT cargo data…</div>
+        </div>
+      </div>
+    );
+  }
 
-  // Expanded database with realistic frozen/packaged food imagery and a denser grid
-  const cargoBatches = [
-    { id: 'FRZ-M1', name: 'Frozen Ground Beef', temp: -2, health: 'Warning', expiry: '3 Days', image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&w=200&q=80', spanRow: 2, spanCol: 2, isSpoiling: true },
-    { id: 'FRZ-P1', name: 'Frozen Peas 20kg', temp: -18, health: 'Excellent', expiry: '6 Months', image: 'https://images.unsplash.com/photo-1598974542316-24e03bc29c0f?auto=format&fit=crop&w=200&q=80', spanRow: 1, spanCol: 1, isSpoiling: false },
-    { id: 'FRZ-C1', name: 'Frozen Chicken Breasts', temp: 15, health: 'Critical', expiry: '1 Day', image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=200&q=80', spanRow: 2, spanCol: 1, isSpoiling: true },
-    { id: 'DRY-M2', name: 'Milk Crates (Tetra)', temp: 4, health: 'Good', expiry: '14 Days', image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=200&q=80', spanRow: 1, spanCol: 2, isSpoiling: false },
-    { id: 'DRY-E1', name: 'Egg Cartons 50x', temp: 6, health: 'Good', expiry: '20 Days', image: 'https://images.unsplash.com/photo-1506976785307-8732e854ad02?auto=format&fit=crop&w=200&q=80', spanRow: 1, spanCol: 1, isSpoiling: false },
-    { id: 'FRZ-I1', name: 'Ice Cream Tubs', temp: -15, health: 'Good', expiry: '3 Months', image: 'https://images.unsplash.com/photo-1558500057-081498b4c023?auto=format&fit=crop&w=200&q=80', spanRow: 2, spanCol: 2, isSpoiling: false },
-    { id: 'FRZ-F1', name: 'Frozen Salmon Fillets', temp: -18, health: 'Excellent', expiry: '4 Months', image: 'https://images.unsplash.com/photo-1485921325833-c519f76c4927?auto=format&fit=crop&w=200&q=80', spanRow: 1, spanCol: 1, isSpoiling: false },
-    { id: 'PRD-A1', name: 'Apple Pallets', temp: 5, health: 'Good', expiry: '10 Days', image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6faa6?auto=format&fit=crop&w=200&q=80', spanRow: 2, spanCol: 1, isSpoiling: false },
-    { id: 'PRD-T1', name: 'Tomato Crates', temp: 22, health: 'Warning', expiry: '4 Days', image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=200&q=80', spanRow: 1, spanCol: 2, isSpoiling: true },
-    { id: 'PRD-B1', name: 'Banana Boxes', temp: 12, health: 'Good', expiry: '5 Days', image: 'https://images.unsplash.com/photo-1587132137056-bfbf0166836e?auto=format&fit=crop&w=200&q=80', spanRow: 1, spanCol: 3, isSpoiling: false },
-  ];
+  // Error screen
+  if (error) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#f1f5f9', fontFamily:'sans-serif' }}>
+        <div style={{ textAlign:'center', maxWidth:'400px' }}>
+          <div style={{ fontSize:'48px', marginBottom:'16px' }}>❌</div>
+          <div style={{ fontSize:'18px', color:'#ef4444', fontWeight:700, marginBottom:'16px' }}>{error}</div>
+          <button onClick={() => navigate('/fleet')} style={{ background:'#3b82f6', color:'white', border:'none', borderRadius:'8px', padding:'12px 24px', cursor:'pointer', fontWeight:700 }}>
+            ← Back to Fleet
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty cargo screen
+  if (cargoBatches.length === 0) {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#f1f5f9', fontFamily:'sans-serif', padding:'20px' }}>
+        <div style={{ textAlign:'center', maxWidth:'400px' }}>
+          <div style={{ fontSize:'56px', marginBottom:'16px' }}>📦</div>
+          <div style={{ fontSize:'22px', fontWeight:800, color:'#0f172a', marginBottom:'8px' }}>No cargo for your shop on {id}</div>
+          <div style={{ fontSize:'14px', color:'#64748b', marginBottom:'24px' }}>
+            This truck hasn't been assigned any of your orders yet. Place an order first and it will appear here.
+          </div>
+          <div style={{ display:'flex', gap:'12px', justifyContent:'center' }}>
+            <button onClick={() => navigate('/')} style={{ background:'#3b82f6', color:'white', border:'none', borderRadius:'8px', padding:'12px 24px', cursor:'pointer', fontWeight:700 }}>
+              🛒 Place an Order
+            </button>
+            <button onClick={() => navigate('/fleet')} style={{ background:'white', color:'#475569', border:'2px solid #e2e8f0', borderRadius:'8px', padding:'12px 24px', cursor:'pointer', fontWeight:700 }}>
+              ← Fleet
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const truck = truckData || {};
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif', padding: '20px', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
-      
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', fontFamily:'sans-serif', padding:'20px', backgroundColor:'#f1f5f9', minHeight:'100vh' }}>
+
       {/* Back Button */}
-      <div style={{ width: '100%', maxWidth: '900px', marginBottom: '20px' }}>
-        <button 
-          onClick={() => navigate('/')} 
-          style={{ padding: '10px 20px', backgroundColor: '#334155', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
+      <div style={{ width:'100%', maxWidth:'900px', marginBottom:'20px' }}>
+        <button onClick={() => navigate('/fleet')}
+          style={{ padding:'10px 20px', backgroundColor:'#334155', border:'none', borderRadius:'6px', cursor:'pointer', fontWeight:'bold', color:'white', display:'flex', alignItems:'center', gap:'8px' }}>
           ⬅ Back to Fleet Dashboard
         </button>
       </div>
 
       {/* Truck Info Header */}
-      <div style={{ backgroundColor: '#0f172a', color: 'white', padding: '20px 40px', borderRadius: '12px', marginBottom: '30px', textAlign: 'center', width: '100%', maxWidth: '700px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-        <h1 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          <span style={{ color: '#3b82f6' }}>LIVE TRACKING:</span> {truckDetails.id}
+      <div style={{ backgroundColor:'#0f172a', color:'white', padding:'20px 40px', borderRadius:'12px', marginBottom:'30px', textAlign:'center', width:'100%', maxWidth:'800px', boxShadow:'0 10px 25px rgba(0,0,0,0.2)' }}>
+        <h1 style={{ margin:'0 0 8px 0', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+          <span style={{ color:'#3b82f6' }}>LIVE TRACKING:</span> {id}
         </h1>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', color: '#cbd5e1', fontWeight: 'bold' }}>
-          <span>📍 {truckDetails.destination}</span>
-          <span>🛣️ {truckDetails.distanceLeft} remaining</span>
-          <span>⏱️ ETA: {truckDetails.daysLeft}</span>
+        <div style={{ fontSize:'14px', color:'#64748b', marginBottom:'12px' }}>
+          👤 Driver: <strong style={{ color:'#94a3b8' }}>{truck.driver}</strong>
+          &nbsp;·&nbsp;
+          📦 {cargoBatches.length} batch{cargoBatches.length !== 1 ? 'es' : ''} for your shop
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:'15px', color:'#cbd5e1', fontWeight:'bold', flexWrap:'wrap', gap:'8px' }}>
+          <span>📍 {truck.destination || 'En Route'}</span>
+          <span>🛣️ {truck.distance_left_km} km remaining</span>
+          <span>⏱️ ETA: {truck.eta_hours}h</span>
+          <span>🌡️ Cabin: {truck.current_temperature}°C</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '60px', alignItems: 'flex-start' }}>
-        
-        {/* The Road Background */}
-        <div className="animated-road" style={{ width: '360px', height: '700px', padding: '20px', borderRadius: '16px', display: 'flex', justifyContent: 'center', overflow: 'hidden', boxShadow: 'inset 0 0 50px rgba(0,0,0,0.5)' }}>
-          
-          {/* The Detailed Truck Assembly */}
+      <div style={{ display:'flex', gap:'40px', alignItems:'flex-start', flexWrap:'wrap', justifyContent:'center' }}>
+
+        {/* Animated Truck with real cargo */}
+        <div className="animated-road" style={{ width:'360px', height:'700px', padding:'20px', borderRadius:'16px', display:'flex', justifyContent:'center', overflow:'hidden', boxShadow:'inset 0 0 50px rgba(0,0,0,0.5)' }}>
           <div className="truck-wrapper">
-            
-            {/* Cab Tires */}
             <div className="wheel w-cab-l"></div>
             <div className="wheel w-cab-r"></div>
-            
-            {/* Cab */}
-            <div className="truck-cab">
-              <div className="windshield"></div>
-            </div>
-            
-            {/* Joint */}
+            <div className="truck-cab"><div className="windshield"></div></div>
             <div className="trailer-joint"></div>
-            
-            {/* Trailer Body */}
             <div className="truck-trailer">
-              {/* Trailer Tires */}
               <div className="wheel w-mid-l"></div>
               <div className="wheel w-mid-r"></div>
               <div className="wheel w-mid-l2"></div>
@@ -96,18 +148,17 @@ const TruckView = () => {
               <div className="wheel w-back-l2"></div>
               <div className="wheel w-back-r2"></div>
 
-              {/* Cargo Grid (Now 3 Columns for denser packing) */}
-              <div className="cargo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', overflowY: 'auto', flex: 1, padding: '4px' }}>
-                
+              {/* Real cargo from shop's orders */}
+              <div className="cargo-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'6px', overflowY:'auto', flex:1, padding:'4px' }}>
                 {cargoBatches.map((batch) => (
-                  <div 
+                  <div
                     key={batch.id}
                     onMouseEnter={() => setHoveredBatch(batch)}
                     onMouseLeave={() => setHoveredBatch(null)}
-                    style={{ 
-                      gridRow: `span ${batch.spanRow}`, 
+                    style={{
+                      gridRow:  `span ${batch.spanRow}`,
                       gridColumn: `span ${batch.spanCol}`,
-                      backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url(${batch.image})`, // Added dark overlay for realism
+                      backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.7)), url(${batch.image})`,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       border: batch.isSpoiling ? '3px solid #ef4444' : '2px solid #94a3b8',
@@ -115,12 +166,15 @@ const TruckView = () => {
                       cursor: 'pointer',
                       minHeight: '75px',
                       position: 'relative',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
                     }}
                   >
-                    {batch.isSpoiling && <div style={{ position: 'absolute', top: -5, right: -5, backgroundColor: '#ef4444', color: 'white', padding: '4px 6px', fontSize: '10px', fontWeight: '900', borderRadius: '4px', border: '2px solid white', zIndex: 5, animation: 'pulse 1.5s infinite' }}>⚠️ ALERT</div>}
-                    <div style={{ position: 'absolute', bottom: '5px', left: '5px', color: 'white', fontSize: '11px', fontWeight: 'bold', backgroundColor: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px' }}>
-                      {batch.id}
+                    {batch.isSpoiling && (
+                      <div style={{ position:'absolute', top:-5, right:-5, backgroundColor:'#ef4444', color:'white', padding:'4px 6px', fontSize:'10px', fontWeight:'900', borderRadius:'4px', border:'2px solid white', zIndex:5, animation:'pulse 1.5s infinite' }}>⚠️ ALERT</div>
+                    )}
+                    <div style={{ position:'absolute', bottom:'5px', left:'5px', color:'white', fontSize:'10px', fontWeight:'bold', backgroundColor:'rgba(0,0,0,0.7)', padding:'2px 5px', borderRadius:'4px', lineHeight:1.3 }}>
+                      <div>{batch.product_id}</div>
+                      <div style={{ color:'#94a3b8' }}>×{batch.quantity}</div>
                     </div>
                   </div>
                 ))}
@@ -129,56 +183,74 @@ const TruckView = () => {
           </div>
         </div>
 
-        {/* The Hover Information Panel */}
-        <div style={{ width: '350px', backgroundColor: 'white', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '25px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-          <h3 style={{ marginTop: 0, borderBottom: '3px solid #f1f5f9', paddingBottom: '15px', color: '#1e293b', fontSize: '20px' }}>📦 IoT Batch Diagnostics</h3>
-          
+        {/* Hover Info Panel */}
+        <div style={{ width:'380px', backgroundColor:'white', border:'1px solid #cbd5e1', borderRadius:'12px', padding:'25px', boxShadow:'0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+          <h3 style={{ marginTop:0, borderBottom:'3px solid #f1f5f9', paddingBottom:'15px', color:'#1e293b', fontSize:'20px' }}>
+            📦 IoT Batch Diagnostics
+          </h3>
+
           {hoveredBatch ? (
-            <div style={{ animation: 'fadeIn 0.2s ease-in' }}>
-              <div style={{ height: '120px', width: '100%', backgroundImage: `url(${hoveredBatch.image})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '8px', marginBottom: '15px' }}></div>
-              
-              <h2 style={{ color: hoveredBatch.isSpoiling ? '#ef4444' : '#0f172a', margin: '10px 0', fontSize: '22px' }}>{hoveredBatch.name}</h2>
-              <p style={{ color: '#64748b', margin: '0 0 15px 0' }}><strong>ID:</strong> {hoveredBatch.id}</p>
-              
-              <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
-                <span style={{ fontSize: '32px', marginRight: '15px' }}>🌡️</span>
+            <div>
+              {/* Product image */}
+              <div style={{ height:'120px', width:'100%', backgroundImage:`url(${hoveredBatch.image})`, backgroundSize:'cover', backgroundPosition:'center', borderRadius:'8px', marginBottom:'15px' }} />
+
+              <h2 style={{ color: hoveredBatch.isSpoiling ? '#ef4444' : '#0f172a', margin:'0 0 4px', fontSize:'20px' }}>{hoveredBatch.name}</h2>
+              <div style={{ fontSize:'13px', color:'#64748b', marginBottom:'4px' }}>Supplier: {hoveredBatch.supplier}</div>
+              <div style={{ fontSize:'13px', color:'#64748b', marginBottom:'12px' }}>Order: {hoveredBatch.order_id}</div>
+
+              {/* Quantity ordered */}
+              <div style={{ background:'#eff6ff', borderRadius:'8px', padding:'10px 14px', marginBottom:'12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ color:'#1d4ed8', fontWeight:700 }}>📦 Your Order Qty</span>
+                <span style={{ fontWeight:900, fontSize:'18px', color:'#0f172a' }}>{hoveredBatch.quantity} × {hoveredBatch.unit}</span>
+              </div>
+
+              {/* Temperature */}
+              <div style={{ display:'flex', alignItems:'center', backgroundColor:'#f8fafc', padding:'15px', borderRadius:'8px', marginBottom:'12px' }}>
+                <span style={{ fontSize:'32px', marginRight:'15px' }}>🌡️</span>
                 <div>
-                  <div style={{ fontSize: '14px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Sensor Temp</div>
-                  <div style={{ fontSize: '28px', fontWeight: '900', color: hoveredBatch.isSpoiling ? '#ef4444' : '#10b981' }}>
+                  <div style={{ fontSize:'13px', color:'#64748b', fontWeight:'bold', textTransform:'uppercase' }}>Sensor Temp</div>
+                  <div style={{ fontSize:'28px', fontWeight:'900', color: hoveredBatch.isSpoiling ? '#ef4444' : '#10b981' }}>
                     {hoveredBatch.temp}°C
                   </div>
+                  <div style={{ fontSize:'12px', color:'#94a3b8' }}>Safe: {hoveredBatch.storage_temp}</div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', marginBottom: '10px' }}>
-                <span style={{ color: '#64748b' }}>Health Status:</span>
-                <span style={{ color: hoveredBatch.isSpoiling ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{hoveredBatch.health}</span>
+              <div style={{ display:'flex', justifyContent:'space-between', borderBottom:'1px solid #e2e8f0', paddingBottom:'10px', marginBottom:'10px' }}>
+                <span style={{ color:'#64748b' }}>Health Status:</span>
+                <span style={{ color: hoveredBatch.isSpoiling ? '#ef4444' : '#10b981', fontWeight:'bold' }}>{hoveredBatch.health}</span>
               </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <span style={{ color: '#64748b' }}>Projected Expiry:</span>
-                <span style={{ fontWeight: 'bold', color: '#0f172a' }}>{hoveredBatch.expiry}</span>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'20px' }}>
+                <span style={{ color:'#64748b' }}>Shelf Life:</span>
+                <span style={{ fontWeight:'bold', color:'#0f172a' }}>{hoveredBatch.expiry}</span>
               </div>
 
               {hoveredBatch.isSpoiling && (
-                <button 
+                <button
                   onClick={() => handleTriggerAuction(hoveredBatch)}
-                  style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '15px', width: '100%', borderRadius: '8px', fontSize: '16px', fontWeight: '900', cursor: 'pointer', transition: '0.2s', boxShadow: '0 4px 6px rgba(239, 68, 68, 0.3)' }}
-                  onMouseOver={(e) => e.target.style.transform = 'scale(1.02)'}
-                  onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                >
+                  style={{ backgroundColor:'#ef4444', color:'white', border:'none', padding:'15px', width:'100%', borderRadius:'8px', fontSize:'16px', fontWeight:'900', cursor:'pointer', boxShadow:'0 4px 6px rgba(239,68,68,0.3)' }}>
                   ⚡ TRIGGER FLASH AUCTION
                 </button>
               )}
             </div>
           ) : (
-            <div style={{ color: '#94a3b8', textAlign: 'center', marginTop: '60px', padding: '20px' }}>
-              <span style={{ fontSize: '50px', display: 'block', marginBottom: '15px' }}>🖱️</span>
-              <p style={{ fontSize: '16px', lineHeight: '1.5' }}>Hover over the cargo grid on the truck to pull live IoT sensor data for each batch.</p>
+            <div style={{ color:'#94a3b8', textAlign:'center', marginTop:'40px', padding:'20px' }}>
+              <span style={{ fontSize:'50px', display:'block', marginBottom:'15px' }}>🖱️</span>
+              <p style={{ fontSize:'16px', lineHeight:'1.5' }}>
+                Hover over the cargo grid to see IoT sensor data for each batch.
+              </p>
+              <div style={{ marginTop:'20px', background:'#f8fafc', borderRadius:'10px', padding:'14px', textAlign:'left' }}>
+                <div style={{ fontSize:'12px', color:'#64748b', fontWeight:700, textTransform:'uppercase', marginBottom:'8px' }}>Your cargo on this truck</div>
+                {cargoBatches.map(b => (
+                  <div key={b.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', padding:'4px 0', borderBottom:'1px solid #f1f5f9', color: b.isSpoiling ? '#ef4444' : '#475569' }}>
+                    <span>{b.isSpoiling ? '⚠️ ' : '✅ '}{b.name}</span>
+                    <span style={{ fontWeight:700 }}>×{b.quantity}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
