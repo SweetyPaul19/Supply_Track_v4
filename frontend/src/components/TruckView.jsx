@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import './TruckView.css';
 
 const API = 'http://127.0.0.1:5000/api';
@@ -18,7 +18,7 @@ const TruckView = () => {
 
   useEffect(() => {
     setLoading(true);
-    axios.get(`${API}/truck/cargo/${id}`, { headers: authHeaders })
+    api.get(`/truck/cargo/${id}`)
       .then(r => {
         setTruckData(r.data.truck);
         setCargoBatches(r.data.cargo);
@@ -33,7 +33,7 @@ const TruckView = () => {
 
   const handleTriggerAuction = async (batch) => {
     try {
-      await axios.post(`${API}/auction/trigger`, {
+      await api.post(`/auction/trigger`, {
         auction_id: `A-${batch.id}`,
         truck_id:   id,
         batch_item: `${batch.quantity} × ${batch.name} (${batch.unit}) — Temp: ${batch.temp}°C`,

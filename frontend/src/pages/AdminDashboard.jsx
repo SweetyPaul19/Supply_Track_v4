@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import socket from '../services/socket';
 import AuctionModal from '../components/AuctionModal';
 import { useAuth } from '../context/AuthContext';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-const API = 'http://127.0.0.1:5000/api';
 
 const haversine = (lat1, lon1, lat2, lon2) => {
   const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
@@ -94,7 +92,7 @@ function TruckMap({ trucks, selectedId, onSelectTruck }) {
 }
 
 function TruckCard({ truck, isSelected, onClick, onInspect }) {
-  const al       = ALERT_STYLES[truck.alert_level] || ALERT_STYLES.normal;
+  const al     = ALERT_STYLES[truck.alert_level] || ALERT_STYLES.normal;
   const progress = Math.round(100 - (truck.distance_left_km / (truck.distance_left_km + 50)) * 100);
 
   return (
@@ -159,27 +157,23 @@ export default function AdminDashboard() {
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    axios.get(`${API}/truck/fleet`)
+    // 1. We removed the hardcoded mock data!
+    api.get(`/truck/fleet`)
       .then(r => {
         setFleet(r.data);
-        setSelectedTruck(r.data[0]?.truck_id || null);
+        if (r.data.length > 0) {
+          setSelectedTruck(r.data[0].truck_id);
+        } else {
+          setSelectedTruck(null);
+        }
         const total = r.data.reduce((s, t) => s + (t.green_credits_earned || 0), 0);
         setGreenCredits(total + (user?.green_credits || 0));
       })
-      .catch(() => {
-        const mock = [
-          { truck_id:'T-1001', driver:'Ramesh Kumar',  status:'In Transit', current_temperature:-18, humidity:62,  remaining_shelf_life_hours:48, destination:'Durgapur Central Hub', origin:'Kolkata Cold Storage', distance_left_km:87,  eta_hours:3, speed_kmh:62, lat:23.374, lng:87.101, cargo_type:'Frozen Goods',     cargo_image:'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400&q=80', alert_level:'normal',   green_credits_earned:12 },
-          { truck_id:'T-1002', driver:'Suresh Patel',  status:'In Transit', current_temperature:4,   humidity:78,  remaining_shelf_life_hours:18, destination:'Asansol Market Yard',  origin:'Burdwan Farm Gate',   distance_left_km:34,  eta_hours:1, speed_kmh:55, lat:23.523, lng:87.198, cargo_type:'Fresh Vegetables', cargo_image:'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&q=80', alert_level:'warning',  green_credits_earned:8  },
-          { truck_id:'T-1003', driver:'Priya Singh',   status:'Loading',    current_temperature:6,   humidity:55,  remaining_shelf_life_hours:72, destination:'Dhanbad Retail Hub',   origin:'Ranchi Dairy Co-op',  distance_left_km:142, eta_hours:5, speed_kmh:0,  lat:23.661, lng:87.421, cargo_type:'Dairy & Eggs',    cargo_image:'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80', alert_level:'normal',   green_credits_earned:5  },
-        ];
-        setFleet(mock);
-        setSelectedTruck(mock[0].truck_id);
-        setGreenCredits(25 + (user?.green_credits || 0));
-      });
+      .catch((e) => console.error("Error fetching fleet:", e));
 
     socket.on('emergency_auction_started', (data) => {
       if (!user?.lat || !user?.lng) return;
-      if (haversine(user.lat, user.lng, data.truck_lat, data.truck_lng) <= 99999)
+      if (haversine(user.lat, user.lng, data.truck_lat, data.truck_lng) <= 15) // Reverting your hackathon fix back to 15km
         setActiveAuction(data);
     });
     return () => socket.off('emergency_auction_started');
@@ -221,6 +215,7 @@ export default function AdminDashboard() {
 
       <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '24px' }}>
 
+        {/* Top Stats Bar */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
           {[
             { label:'Active Trucks', val: fleet.length, icon:'🚛', color:'#3b82f6', bg:'rgba(59,130,246,0.1)',  border:'rgba(59,130,246,0.25)'  },
@@ -245,47 +240,59 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
-          <div>
-            <TruckMap trucks={fleet} selectedId={selectedTruck} onSelectTruck={setSelectedTruck} />
+        {/* 2. THE EMPTY STATE UI */}
+        {fleet.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '100px 20px', background: '#0a1628', borderRadius: '16px', border: '1px dashed #1e3a5f', marginTop: '20px' }}>
+             <div style={{ fontSize: '64px', marginBottom: '16px' }}>🚛</div>
+             <h2 style={{ fontSize: '28px', color: '#f1f5f9', margin: '0 0 12px 0' }}>No Active Deliveries</h2>
+             <p style={{ color: '#94a3b8', marginBottom: '24px', fontSize: '16px' }}>You currently have no orders in transit. Place a wholesale order to start tracking your LiveTrack fleet.</p>
+             <button onClick={() => navigate('/')} style={{ background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)', color: 'white', border: 'none', borderRadius: '10px', padding: '14px 28px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', boxShadow: '0 8px 24px rgba(59,130,246,0.2)' }}>
+               🛒 Go to Wholesale Catalogue
+             </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
+            <div>
+              <TruckMap trucks={fleet} selectedId={selectedTruck} onSelectTruck={setSelectedTruck} />
 
-            {selectedTruck && (() => {
-              const t  = fleet.find(x => x.truck_id === selectedTruck);
-              if (!t) return null;
-              const al = ALERT_STYLES[t.alert_level] || ALERT_STYLES.normal;
-              return (
-                <div style={{ marginTop: '16px', background: '#0a1628', borderRadius: '14px', border: `1px solid ${al.border}33`, padding: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
-                  <img src={t.cargo_image} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 900, fontSize: '18px', marginBottom: '4px' }}>{t.truck_id} — {t.cargo_type}</div>
-                    <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>{t.origin} → {t.destination}</div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {[`🌡️ ${t.current_temperature}°C`, `⏱️ ETA ${t.eta_hours}h`, `📍 ${t.distance_left_km} km left`, `👤 ${t.driver}`].map(tag => (
-                        <span key={tag} style={{ background: '#1e293b', color: '#94a3b8', borderRadius: '6px', padding: '3px 10px', fontSize: '12px' }}>{tag}</span>
-                      ))}
+              {selectedTruck && (() => {
+                const t  = fleet.find(x => x.truck_id === selectedTruck);
+                if (!t) return null;
+                const al = ALERT_STYLES[t.alert_level] || ALERT_STYLES.normal;
+                return (
+                  <div style={{ marginTop: '16px', background: '#0a1628', borderRadius: '14px', border: `1px solid ${al.border}33`, padding: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <img src={t.cargo_image} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 900, fontSize: '18px', marginBottom: '4px' }}>{t.truck_id} — {t.cargo_type}</div>
+                      <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>{t.origin} → {t.destination}</div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {[`🌡️ ${t.current_temperature}°C`, `⏱️ ETA ${t.eta_hours}h`, `📍 ${t.distance_left_km} km left`, `👤 ${t.driver}`].map(tag => (
+                          <span key={tag} style={{ background: '#1e293b', color: '#94a3b8', borderRadius: '6px', padding: '3px 10px', fontSize: '12px' }}>{tag}</span>
+                        ))}
+                      </div>
                     </div>
+                    <button onClick={() => navigate(`/truck/${t.truck_id}`)}
+                      style={{ background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 20px', cursor: 'pointer', fontWeight: 800, fontSize: '13px', flexShrink: 0, boxShadow: '0 4px 16px rgba(59,130,246,0.35)' }}>
+                      Open IoT<br/>Dashboard →
+                    </button>
                   </div>
-                  <button onClick={() => navigate(`/truck/${t.truck_id}`)}
-                    style={{ background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 20px', cursor: 'pointer', fontWeight: 800, fontSize: '13px', flexShrink: 0, boxShadow: '0 4px 16px rgba(59,130,246,0.35)' }}>
-                    Open IoT<br/>Dashboard →
-                  </button>
-                </div>
-              );
-            })()}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ fontSize: '12px', color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, marginBottom: '4px' }}>
-              Fleet — {fleet.length} vehicles
+                );
+              })()}
             </div>
-            {fleet.map(truck => (
-              <TruckCard key={truck.truck_id} truck={truck}
-                isSelected={selectedTruck === truck.truck_id}
-                onClick={() => setSelectedTruck(truck.truck_id)}
-                onInspect={id => navigate(`/truck/${id}`)} />
-            ))}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '12px', color: '#475569', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, marginBottom: '4px' }}>
+                Fleet — {fleet.length} vehicles
+              </div>
+              {fleet.map(truck => (
+                <TruckCard key={truck.truck_id} truck={truck}
+                  isSelected={selectedTruck === truck.truck_id}
+                  onClick={() => setSelectedTruck(truck.truck_id)}
+                  onInspect={id => navigate(`/truck/${id}`)} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {activeAuction && <AuctionModal auctionData={activeAuction} onClose={() => setActiveAuction(null)} />}

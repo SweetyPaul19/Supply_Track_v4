@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const AuthPage = () => {
@@ -56,7 +56,7 @@ const AuthPage = () => {
     const url = isLogin ? 'http://127.0.0.1:5000/api/auth/login' : 'http://127.0.0.1:5000/api/auth/register';
 
     try {
-      const response = await axios.post(url, formData);
+      const response = await api.post(url, formData);
       login(response.data.token, response.data.shop); 
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong. Is Flask running?');

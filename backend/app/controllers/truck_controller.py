@@ -74,11 +74,11 @@ def get_shop_from_token():
 def get_fleet():
     """
     Returns only the trucks that have orders from this shop.
-    If no orders yet, returns all 3 trucks (so dashboard isn't empty).
+    If no orders yet, returns an EMPTY array.
     """
     shop = get_shop_from_token()
     if not shop:
-        return jsonify(list(FLEET.values())), 200
+        return jsonify([]), 200 # <-- FIXED: Return empty
 
     # Find all truck IDs assigned to this shop's orders
     shop_orders = list(db.orders.find(
@@ -88,8 +88,8 @@ def get_fleet():
     assigned_truck_ids = list(set(o['assigned_truck'] for o in shop_orders if o.get('assigned_truck')))
 
     if not assigned_truck_ids:
-        # No orders yet — show all trucks
-        return jsonify(list(FLEET.values())), 200
+        # No orders yet — return empty array!
+        return jsonify([]), 200 # <-- FIXED: Return empty
 
     # Return only trucks this shop has orders on
     shop_fleet = [FLEET[tid] for tid in assigned_truck_ids if tid in FLEET]

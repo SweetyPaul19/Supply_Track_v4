@@ -1,9 +1,12 @@
-import { io } from 'socket.io-client';
+import { io } from "socket.io-client";
 
-import {load_env} from 'dotenv';
+const socket = io("http://127.0.0.1:5000", {
+  transports: ["websocket"],   // 🔥 important
+  autoConnect: true,
+});
 
-
-// Connect to the Flask backend URL
-const socket = io('http://127.0.0.1:5000');
+socket.on("connect", () => {
+  console.log("✅ Socket connected:", socket.id);
+});
 
 export default socket;

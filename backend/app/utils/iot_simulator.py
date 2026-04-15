@@ -63,18 +63,17 @@ def simulate(truck_id="T-1001"):
         print(f"\n⚡ Phase 2: Simulating hardware failure...\n")
         time.sleep(1)
 
-        danger_temp = hi + 10
-        spike_temps = [round(hi + 2, 1), round(hi + 6, 1), round(danger_temp, 1)]
+        # THE FIX: Force the temperatures to cross 0°C so Flask catches it!
+        spike_temps = [-5.2, 2.1, 15.4]
 
         for spike in spike_temps:
             batch_data["temp"] = spike
-            label = "🚨 CRITICAL" if spike > hi + 5 else "⚠️  WARNING"
+            label = "🚨 CRITICAL" if spike > 0 else "⚠️  WARNING"
             print(f"  [{label}] Temp: {spike}°C — sending alert...")
             requests.post(WEBHOOK_URL, json=batch_data)
             time.sleep(2)
 
         print("\n✅ Simulation complete — auction should have triggered!\n")
-
     except requests.exceptions.ConnectionError:
         print("❌ Could not connect to Flask. Make sure the backend is running.")
 
