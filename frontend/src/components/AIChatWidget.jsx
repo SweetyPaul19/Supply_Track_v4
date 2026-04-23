@@ -161,8 +161,22 @@ export default function AIChatWidget({ page = 'shop', accent = 'light' }) {
         </div>
       )}
 
-      <button type="button" className="ai-chat-widget__toggle" onClick={() => setIsOpen((prev) => !prev)}>
-        AI
+      <button
+        type="button"
+        className={`ai-chat-widget__toggle ${isOpen ? 'ai-chat-widget__toggle--open' : ''}`}
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label="Open AI copilot"
+      >
+        <span className="ai-chat-widget__toggle-ring ai-chat-widget__toggle-ring--outer" />
+        <span className="ai-chat-widget__toggle-ring ai-chat-widget__toggle-ring--inner" />
+        <span className="ai-chat-widget__toggle-core">
+          <span className="ai-chat-widget__toggle-icon">✦</span>
+          <span className="ai-chat-widget__toggle-text">
+            <strong>AI</strong>
+            <small>Copilot</small>
+          </span>
+        </span>
+        <span className="ai-chat-widget__toggle-badge">LIVE</span>
       </button>
     </div>
   );
