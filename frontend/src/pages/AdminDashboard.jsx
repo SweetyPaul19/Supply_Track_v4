@@ -22,6 +22,7 @@ const ALERT_STYLES = {
 };
 
 const STATUS_ICON = { 'In Transit': '🚛', 'Loading': '📦', 'Delivered': '✅', 'Delayed': '⚠️' };
+const RISK_COLORS = { safe: '#22c55e', watch: '#facc15', warning: '#f59e0b', critical: '#ef4444' };
 
 function makeTruckIcon(color, isSelected) {
   const size = isSelected ? 44 : 36;
@@ -95,6 +96,7 @@ function TruckMap({ trucks, selectedId, onSelectTruck }) {
 function TruckCard({ truck, isSelected, onClick, onInspect }) {
   const al     = ALERT_STYLES[truck.alert_level] || ALERT_STYLES.normal;
   const progress = Math.round(100 - (truck.distance_left_km / (truck.distance_left_km + 50)) * 100);
+  const risk = truck.risk_summary || { level: 'safe', score: 0, summary: 'No active cargo risk detected.' };
 
   return (
     <div onClick={onClick} style={{ background: isSelected ? '#0f172a' : '#111827', borderRadius: '16px', border: `2px solid ${isSelected ? al.border : '#1e293b'}`, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', boxShadow: isSelected ? `0 0 24px ${al.border}33` : '0 4px 12px rgba(0,0,0,0.3)' }}>
@@ -129,6 +131,14 @@ function TruckCard({ truck, isSelected, onClick, onInspect }) {
               <div style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase' }}>{s.label}</div>
             </div>
           ))}
+        </div>
+
+        <div style={{ background: '#081120', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', border: `1px solid ${(RISK_COLORS[risk.level] || '#22c55e')}44` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Spoilage Risk</span>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: RISK_COLORS[risk.level] || '#22c55e' }}>{risk.level.toUpperCase()} · {risk.score}/100</span>
+          </div>
+          <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: 1.4 }}>{risk.summary}</div>
         </div>
 
         <div style={{ marginBottom: '12px' }}>
@@ -273,6 +283,7 @@ export default function AdminDashboard() {
                 const t  = fleet.find(x => x.truck_id === selectedTruck);
                 if (!t) return null;
                 const al = ALERT_STYLES[t.alert_level] || ALERT_STYLES.normal;
+                const risk = t.risk_summary || { level: 'safe', score: 0, summary: 'No active cargo risk detected.', recommended_action: 'Continue standard monitoring.' };
                 return (
                   <div style={{ marginTop: '16px', background: '#0a1628', borderRadius: '14px', border: `1px solid ${al.border}33`, padding: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
                     <img src={t.cargo_image} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px', flexShrink: 0 }} />
@@ -283,6 +294,10 @@ export default function AdminDashboard() {
                         {[`🌡️ ${t.current_temperature}°C`, `⏱️ ETA ${t.eta_hours}h`, `📍 ${t.distance_left_km} km left`, `👤 ${t.driver}`].map(tag => (
                           <span key={tag} style={{ background: '#1e293b', color: '#94a3b8', borderRadius: '6px', padding: '3px 10px', fontSize: '12px' }}>{tag}</span>
                         ))}
+                      </div>
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#cbd5e1' }}>
+                        Risk: <span style={{ color: RISK_COLORS[risk.level] || '#22c55e', fontWeight: 800 }}>{risk.level.toUpperCase()} · {risk.score}/100</span>
+                        {' '}· {risk.summary}
                       </div>
                     </div>
                     <button onClick={() => navigate(`/truck/${t.truck_id}`)}

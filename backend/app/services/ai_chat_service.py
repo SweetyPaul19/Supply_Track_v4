@@ -4,6 +4,7 @@ from datetime import datetime
 from app import db
 from app.controllers.auction_controller import active_auction_state
 from app.services.fleet_automation_service import get_trucks_for_ids, seed_trucks_if_needed, sync_and_advance_fleet
+from app.services.spoilage_risk_service import summarize_truck_risk
 from .gemini_service import GeminiServiceError, gemini_is_configured, generate_json_response
 
 
@@ -77,6 +78,7 @@ def build_chat_context(shop_id: str, question: str, page: str | None = None) -> 
                 "items.quantity": 1,
                 "items.category": 1,
                 "items.shelf_life_days": 1,
+                "items.storage_temp": 1,
             },
         ).sort("created_at", -1).limit(5)
     )
@@ -89,6 +91,19 @@ def build_chat_context(shop_id: str, question: str, page: str | None = None) -> 
         }
     )
     assigned_trucks = get_trucks_for_ids(assigned_truck_ids)
+    items_by_truck = {}
+    for order in recent_orders:
+        truck_id = order.get("assigned_truck")
+        if not truck_id:
+            continue
+        items_by_truck.setdefault(truck_id, []).extend(order.get("items", []))
+
+    for truck in assigned_trucks:
+        truck["risk_summary"] = summarize_truck_risk(
+            truck,
+            items_by_truck.get(truck["truck_id"], []),
+            use_ai=False,
+        )
 
     active_auction = None
     if active_auction_state.get("is_active"):
@@ -168,16 +183,22 @@ def build_fallback_response(context: dict, question: str) -> dict:
             actions = ["Place an order to activate fleet tracking for your shop."]
             return build_response(answer, actions, [], [], [])
 
-        risky = [truck for truck in trucks if truck.get("alert_level") in {"warning", "critical"}]
+        risky = [
+            truck for truck in trucks
+            if (truck.get("risk_summary") or {}).get("level") in {"warning", "critical"}
+            or truck.get("alert_level") in {"warning", "critical"}
+        ]
         primary = risky[0] if risky else trucks[0]
+        risk_summary = primary.get("risk_summary") or {}
         answer = (
             f"{primary['truck_id']} is the highest-priority truck in your fleet view. "
-            f"It is {primary['status']} with alert level {primary['alert_level']}, "
-            f"temperature {primary['current_temperature']}C, and ETA {primary['eta_hours']}h."
+            f"It is {primary['status']} with spoilage risk {risk_summary.get('level', 'safe')}, "
+            f"risk score {risk_summary.get('score', 0)}/100, temperature {primary['current_temperature']}C, "
+            f"and ETA {primary['eta_hours']}h."
         )
         actions = [
             f"Open {primary['truck_id']} diagnostics for cargo details.",
-            "Review current fleet summary on the Fleet dashboard.",
+            risk_summary.get("recommended_action", "Review current fleet summary on the Fleet dashboard."),
         ]
         return build_response(answer, actions, [], [primary["truck_id"]], [])
 

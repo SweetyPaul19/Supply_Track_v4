@@ -8,6 +8,7 @@ from app.services.fleet_automation_service import (
     seed_trucks_if_needed,
     sync_and_advance_fleet,
 )
+from app.services.spoilage_risk_service import evaluate_batch_risk, summarize_truck_risk
 import jwt
 import os
 
@@ -61,20 +62,34 @@ def get_fleet():
 
     shop_orders = list(db.orders.find(
         {"shop_id": shop['shop_id'], "assigned_truck": {"$exists": True}, "status": {"$ne": "Delivered"}},
-        {"assigned_truck": 1}
+        {"assigned_truck": 1, "items": 1}
     ))
     assigned_truck_ids = list(set(o['assigned_truck'] for o in shop_orders if o.get('assigned_truck')))
 
     if not assigned_truck_ids:
         return jsonify([]), 200
 
-    return jsonify(get_trucks_for_ids(assigned_truck_ids)), 200
+    orders_by_truck = {}
+    for order in shop_orders:
+        truck_id = order.get("assigned_truck")
+        if not truck_id:
+            continue
+        orders_by_truck.setdefault(truck_id, []).extend(order.get("items", []))
+
+    fleet = []
+    for truck in get_trucks_for_ids(assigned_truck_ids):
+        truck["risk_summary"] = summarize_truck_risk(truck, orders_by_truck.get(truck["truck_id"], []), use_ai=False)
+        fleet.append(truck)
+
+    return jsonify(fleet), 200
 
 
 @truck_bp.route('/status', methods=['GET'])
 def get_truck_status():
     seed_trucks_if_needed()
     truck = get_truck_doc("T-1001")
+    if truck:
+        truck["risk_summary"] = summarize_truck_risk(truck, [], use_ai=False)
     return jsonify(truck or {}), 200
 
 
@@ -84,6 +99,14 @@ def get_single_truck(truck_id):
     truck = get_truck_doc(truck_id)
     if not truck:
         return jsonify({"error": "Truck not found"}), 404
+    orders = list(db.orders.find(
+        {"assigned_truck": truck_id, "status": {"$ne": "Delivered"}},
+        {"_id": 0, "items": 1}
+    ))
+    items = []
+    for order in orders:
+        items.extend(order.get("items", []))
+    truck["risk_summary"] = summarize_truck_risk(truck, items, use_ai=False)
     return jsonify(truck), 200
 
 
@@ -104,7 +127,7 @@ def get_truck_cargo(truck_id):
         return jsonify({"error": "Truck not found"}), 404
 
     orders = list(db.orders.find(
-        {"shop_id": shop['shop_id'], "assigned_truck": truck_id},
+        {"shop_id": shop['shop_id'], "assigned_truck": truck_id, "status": {"$ne": "Delivered"}},
         {"_id": 0, "order_id": 1, "items": 1, "status": 1}
     ))
 
@@ -112,16 +135,7 @@ def get_truck_cargo(truck_id):
     for order in orders:
         for item in order.get('items', []):
             temp = truck['current_temperature']
-            storage = item.get('storage_temp', '')
-            is_spoiling = False
-            if '-18' in storage and temp > -10:
-                is_spoiling = True
-            elif '2-4' in storage and temp > 8:
-                is_spoiling = True
-            elif '4-8' in storage and temp > 12:
-                is_spoiling = True
-            elif '12' in storage and temp > 20:
-                is_spoiling = True
+            risk = evaluate_batch_risk(truck, item, use_ai=False)
 
             shelf = item.get('shelf_life_days', 30)
             if shelf <= 3:
@@ -149,10 +163,17 @@ def get_truck_cargo(truck_id):
                     item['product_id'],
                     "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&q=80",
                 ),
-                "isSpoiling": is_spoiling,
+                "isSpoiling": risk["is_spoiling"],
+                "risk":       risk,
                 "spanRow":    1,
                 "spanCol":    1,
             })
+
+    truck["risk_summary"] = summarize_truck_risk(
+        truck,
+        [item for order in orders for item in order.get("items", [])],
+        use_ai=False,
+    )
 
     return jsonify({
         "truck":   truck,

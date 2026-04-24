@@ -103,6 +103,7 @@ const TruckView = () => {
   }
 
   const truck = truckData || {};
+  const truckRisk = truck.risk_summary || null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontFamily: 'sans-serif', padding: '20px', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
@@ -131,6 +132,14 @@ const TruckView = () => {
           <span>Cabin: {truck.current_temperature}C</span>
           <span>Status: {truck.status}</span>
         </div>
+        {truckRisk && (
+          <div style={{ marginTop: '14px', background: 'rgba(15,23,42,0.55)', border: `1px solid ${truckRisk.level === 'critical' ? '#ef4444' : truckRisk.level === 'warning' ? '#f59e0b' : truckRisk.level === 'watch' ? '#facc15' : '#22c55e'}`, borderRadius: '10px', padding: '12px 14px', textAlign: 'left' }}>
+            <div style={{ fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Spoilage Risk Summary</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>{truckRisk.level.toUpperCase()} · {truckRisk.score}/100</div>
+            <div style={{ color: '#cbd5e1', fontSize: '13px', marginBottom: '4px' }}>{truckRisk.summary}</div>
+            <div style={{ color: '#93c5fd', fontSize: '13px' }}>Recommended: {truckRisk.recommended_action}</div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '40px', alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -219,9 +228,28 @@ const TruckView = () => {
                 <span style={{ color: '#64748b' }}>Health Status:</span>
                 <span style={{ color: hoveredBatch.isSpoiling ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{hoveredBatch.health}</span>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', marginBottom: '10px' }}>
+                <span style={{ color: '#64748b' }}>Risk Score:</span>
+                <span style={{ color: hoveredBatch.risk?.level === 'critical' ? '#ef4444' : hoveredBatch.risk?.level === 'warning' ? '#f59e0b' : '#0f172a', fontWeight: 'bold' }}>
+                  {(hoveredBatch.risk?.level || 'safe').toUpperCase()} · {hoveredBatch.risk?.score || 0}/100
+                </span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <span style={{ color: '#64748b' }}>Shelf Life:</span>
                 <span style={{ fontWeight: 'bold', color: '#0f172a' }}>{hoveredBatch.expiry}</span>
+              </div>
+              <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Risk Explanation</div>
+                <div style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>{hoveredBatch.risk?.summary}</div>
+              </div>
+              <div style={{ backgroundColor: '#eff6ff', borderRadius: '8px', padding: '12px 14px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '12px', color: '#1d4ed8', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Recommended Action</div>
+                <div style={{ fontSize: '13px', color: '#1e3a8a', lineHeight: 1.5 }}>{hoveredBatch.risk?.recommended_action}</div>
+                {!!hoveredBatch.risk?.reasons?.length && (
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#475569' }}>
+                    Key signals: {hoveredBatch.risk.reasons.join(' ')}
+                  </div>
+                )}
               </div>
 
               {hoveredBatch.isSpoiling && (
@@ -243,8 +271,8 @@ const TruckView = () => {
                 <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px' }}>Your cargo on this truck</div>
                 {cargoBatches.map(b => (
                   <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '4px 0', borderBottom: '1px solid #f1f5f9', color: b.isSpoiling ? '#ef4444' : '#475569' }}>
-                    <span>{b.isSpoiling ? 'Alert ' : 'OK '}{b.name}</span>
-                    <span style={{ fontWeight: 700 }}>x{b.quantity}</span>
+                    <span>{(b.risk?.level || 'safe').toUpperCase()} {b.name}</span>
+                    <span style={{ fontWeight: 700 }}>{b.risk?.score || 0}/100</span>
                   </div>
                 ))}
               </div>
